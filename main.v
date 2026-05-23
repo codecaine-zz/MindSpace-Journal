@@ -121,6 +121,7 @@ pub mut:
 	hover_filter_mood bool
 	hover_filter_date bool
 	hover_moods       []bool
+	hover_exit        bool
 	
 	// Cursor blinking
 	cursor_ticks int
@@ -786,6 +787,11 @@ fn draw_form_mode(app &App, t Theme) {
 
 fn handle_click(mx int, my int, mut app App) {
 	os.write_file('click.log', 'click: mx=${mx}, my=${my}, scale=${app.ctx.scale}, win=${app.win_width}x${app.win_height}\n') or {}
+	if mx >= 20 && mx <= 230 && my >= app.win_height - 40 && my <= app.win_height - 10 {
+		app.ctx.quit()
+		return
+	}
+
 	if mx >= 180 && mx <= 240 && my >= 20 && my <= 45 {
 		app.is_dark_mode = !app.is_dark_mode
 		save_settings_to_file(app.is_dark_mode, app.win_width, app.win_height)
@@ -875,7 +881,7 @@ fn handle_click(mx int, my int, mut app App) {
 
 	// Sidebar list starts at y: list_y_start.
 	filtered_entries := app.get_filtered_entries()
-	if mx >= 10 && mx <= 240 && my >= list_y_start {
+	if mx >= 10 && mx <= 240 && my >= list_y_start && my < app.win_height - 50 {
 		y_offset := my - list_y_start + app.list_scroll_y
 		item_index := y_offset / 70
 		if y_offset % 70 <= 60 && item_index >= 0 && item_index < filtered_entries.len {
@@ -973,6 +979,7 @@ fn handle_move(mx int, my int, mut app App) {
 	app.hover_new = mx >= 20 && mx <= 230 && my >= 60 && my <= 95
 	app.hover_filter_mood = mx >= 20 && mx <= 230 && my >= 150 && my <= 180
 	app.hover_filter_date = mx >= 20 && mx <= 230 && my >= 190 && my <= 220
+	app.hover_exit = mx >= 20 && mx <= 230 && my >= app.win_height - 40 && my <= app.win_height - 10
 
 	if app.mode == .view {
 		app.hover_edit = mx >= 280 && mx <= 380 && my >= app.win_height - 60 && my <= app.win_height - 15
@@ -1158,7 +1165,7 @@ fn handle_scroll(e &gg.Event, mut app App) {
 		}
 		filtered := app.get_filtered_entries()
 		list_y_start := if app.filter_date == 'Custom Range' { 280 } else { 230 }
-		max_scroll := filtered.len * 70 - (app.win_height - list_y_start)
+		max_scroll := filtered.len * 70 - (app.win_height - 50 - list_y_start)
 		if max_scroll < 0 {
 			app.list_scroll_y = 0
 		} else if app.list_scroll_y > max_scroll {
@@ -1253,7 +1260,7 @@ fn on_frame(mut app App) {
 	filtered := app.get_filtered_entries()
 	for i, entry in filtered {
 		by := list_y_start + i * 70 - app.list_scroll_y
-		if by < list_y_start - 10 || by > app.win_height {
+		if by < list_y_start - 10 || by > app.win_height - 110 {
 			continue
 		}
 		
@@ -1268,6 +1275,13 @@ fn on_frame(mut app App) {
 		app.ctx.draw_text(20, by + 8, title_trunc, size: 14, color: t.text_primary, bold: true)
 		app.ctx.draw_text(20, by + 32, '${entry.date}  ${entry.mood}', size: 12, color: t.text_sec)
 	}
+
+	// Draw Sidebar Footer (Exit Button)
+	app.ctx.draw_rect_filled(0, app.win_height - 50, app.sidebar_width, 50, t.bg_sidebar)
+	app.ctx.draw_line(0, app.win_height - 50, app.sidebar_width, app.win_height - 50, t.border)
+	exit_btn_color := if app.hover_exit { gg.rgb(220, 38, 38) } else { gg.rgb(185, 28, 28) }
+	app.ctx.draw_rect_filled(20, app.win_height - 40, 210, 30, exit_btn_color)
+	app.ctx.draw_text(74, app.win_height - 32, 'Exit Application', size: 12, color: gg.white, bold: true)
 
 	// 2. Draw Main Panel
 	app.ctx.draw_rect_filled(app.sidebar_width + 1, 0, app.win_width - app.sidebar_width, app.win_height, t.bg_base)
@@ -1289,6 +1303,10 @@ fn on_event(e &gg.Event, mut app App) {
 	} else if e.typ == .char {
 		handle_char(e.char_code, mut app)
 	} else if e.typ == .key_down {
+		if e.key_code == .q && (e.modifiers & u32(gg.Modifier.super)) != 0 {
+			app.ctx.quit()
+			return
+		}
 		handle_key(e.key_code, mut app)
 	} else if e.typ == .mouse_scroll {
 		handle_scroll(e, mut app)
