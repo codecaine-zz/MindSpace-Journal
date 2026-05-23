@@ -485,6 +485,49 @@ fn delete_forward_char(mut input TextInput) {
 	input.text = runes.string()
 }
 
+fn is_space_char(r rune) bool {
+	return r == ` ` || r == `\t` || r == `\n` || r == `\r`
+}
+
+fn move_cursor_to_start(mut input TextInput) {
+	input.cursor_pos = 0
+}
+
+fn move_cursor_to_end(mut input TextInput) {
+	runes := input.text.runes()
+	input.cursor_pos = runes.len
+}
+
+fn move_cursor_next_word(mut input TextInput) {
+	runes := input.text.runes()
+	if input.cursor_pos >= runes.len {
+		return
+	}
+	mut pos := input.cursor_pos
+	for pos < runes.len && is_space_char(runes[pos]) {
+		pos++
+	}
+	for pos < runes.len && !is_space_char(runes[pos]) {
+		pos++
+	}
+	input.cursor_pos = pos
+}
+
+fn move_cursor_prev_word(mut input TextInput) {
+	runes := input.text.runes()
+	if input.cursor_pos <= 0 {
+		return
+	}
+	mut pos := input.cursor_pos
+	for pos > 0 && is_space_char(runes[pos - 1]) {
+		pos--
+	}
+	for pos > 0 && !is_space_char(runes[pos - 1]) {
+		pos--
+	}
+	input.cursor_pos = pos
+}
+
 fn move_cursor_left(mut input TextInput) {
 	if input.cursor_pos > 0 {
 		input.cursor_pos--
@@ -1033,7 +1076,7 @@ fn handle_char(char_code u32, mut app App) {
 	}
 }
 
-fn handle_key(key_code gg.KeyCode, mut app App) {
+fn handle_key(key_code gg.KeyCode, modifiers u32, mut app App) {
 	if key_code == .backspace {
 		if app.title_input.is_focused {
 			delete_char(mut app.title_input)
@@ -1107,32 +1150,108 @@ fn handle_key(key_code gg.KeyCode, mut app App) {
 			app.date_from_input.is_focused = true
 		}
 	} else if key_code == .left {
+		is_cmd := (modifiers & u32(gg.Modifier.super)) != 0
+		is_alt := (modifiers & u32(gg.Modifier.alt)) != 0
 		if app.title_input.is_focused {
-			move_cursor_left(mut app.title_input)
+			if is_cmd {
+				move_cursor_to_start(mut app.title_input)
+			} else if is_alt {
+				move_cursor_prev_word(mut app.title_input)
+			} else {
+				move_cursor_left(mut app.title_input)
+			}
 		} else if app.content_input.is_focused {
-			move_cursor_left(mut app.content_input)
+			if is_cmd {
+				move_cursor_to_start(mut app.content_input)
+			} else if is_alt {
+				move_cursor_prev_word(mut app.content_input)
+			} else {
+				move_cursor_left(mut app.content_input)
+			}
 		} else if app.tags_input.is_focused {
-			move_cursor_left(mut app.tags_input)
+			if is_cmd {
+				move_cursor_to_start(mut app.tags_input)
+			} else if is_alt {
+				move_cursor_prev_word(mut app.tags_input)
+			} else {
+				move_cursor_left(mut app.tags_input)
+			}
 		} else if app.search_input.is_focused {
-			move_cursor_left(mut app.search_input)
+			if is_cmd {
+				move_cursor_to_start(mut app.search_input)
+			} else if is_alt {
+				move_cursor_prev_word(mut app.search_input)
+			} else {
+				move_cursor_left(mut app.search_input)
+			}
 		} else if app.date_from_input.is_focused {
-			move_cursor_left(mut app.date_from_input)
+			if is_cmd {
+				move_cursor_to_start(mut app.date_from_input)
+			} else if is_alt {
+				move_cursor_prev_word(mut app.date_from_input)
+			} else {
+				move_cursor_left(mut app.date_from_input)
+			}
 		} else if app.date_to_input.is_focused {
-			move_cursor_left(mut app.date_to_input)
+			if is_cmd {
+				move_cursor_to_start(mut app.date_to_input)
+			} else if is_alt {
+				move_cursor_prev_word(mut app.date_to_input)
+			} else {
+				move_cursor_left(mut app.date_to_input)
+			}
 		}
 	} else if key_code == .right {
+		is_cmd := (modifiers & u32(gg.Modifier.super)) != 0
+		is_alt := (modifiers & u32(gg.Modifier.alt)) != 0
 		if app.title_input.is_focused {
-			move_cursor_right(mut app.title_input)
+			if is_cmd {
+				move_cursor_to_end(mut app.title_input)
+			} else if is_alt {
+				move_cursor_next_word(mut app.title_input)
+			} else {
+				move_cursor_right(mut app.title_input)
+			}
 		} else if app.content_input.is_focused {
-			move_cursor_right(mut app.content_input)
+			if is_cmd {
+				move_cursor_to_end(mut app.content_input)
+			} else if is_alt {
+				move_cursor_next_word(mut app.content_input)
+			} else {
+				move_cursor_right(mut app.content_input)
+			}
 		} else if app.tags_input.is_focused {
-			move_cursor_right(mut app.tags_input)
+			if is_cmd {
+				move_cursor_to_end(mut app.tags_input)
+			} else if is_alt {
+				move_cursor_next_word(mut app.tags_input)
+			} else {
+				move_cursor_right(mut app.tags_input)
+			}
 		} else if app.search_input.is_focused {
-			move_cursor_right(mut app.search_input)
+			if is_cmd {
+				move_cursor_to_end(mut app.search_input)
+			} else if is_alt {
+				move_cursor_next_word(mut app.search_input)
+			} else {
+				move_cursor_right(mut app.search_input)
+			}
 		} else if app.date_from_input.is_focused {
-			move_cursor_right(mut app.date_from_input)
+			if is_cmd {
+				move_cursor_to_end(mut app.date_from_input)
+			} else if is_alt {
+				move_cursor_next_word(mut app.date_from_input)
+			} else {
+				move_cursor_right(mut app.date_from_input)
+			}
 		} else if app.date_to_input.is_focused {
-			move_cursor_right(mut app.date_to_input)
+			if is_cmd {
+				move_cursor_to_end(mut app.date_to_input)
+			} else if is_alt {
+				move_cursor_next_word(mut app.date_to_input)
+			} else {
+				move_cursor_right(mut app.date_to_input)
+			}
 		}
 	} else if key_code == .up {
 		if app.content_input.is_focused {
@@ -1307,7 +1426,7 @@ fn on_event(e &gg.Event, mut app App) {
 			app.ctx.quit()
 			return
 		}
-		handle_key(e.key_code, mut app)
+		handle_key(e.key_code, e.modifiers, mut app)
 	} else if e.typ == .mouse_scroll {
 		handle_scroll(e, mut app)
 	}
