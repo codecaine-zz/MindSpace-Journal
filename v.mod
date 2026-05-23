@@ -1,7 +1,7 @@
 Module {
-	name: 'minesweeper'
-	description: 'minesweeper'
-	version: '0.0.0'
+	name: 'MindSpace Journal'
+	description: 'A sleek, local-first personal journaling application.'
+	version: '1.0.0'
 	license: 'MIT'
 	dependencies: []
 }
