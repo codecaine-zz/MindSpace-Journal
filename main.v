@@ -375,17 +375,27 @@ fn find_line_starts(text string, lines []string) []int {
 	return starts
 }
 
-fn position_cursor_singleline(mx int, x int, w int, size int, mut input TextInput, ctx &gg.Context) {
+fn text_width(ctx &gg.Context, text string, size int) int {
+	if text == '' {
+		return 0
+	}
 	ctx.set_text_cfg(size: size)
+	w_dot, _ := ctx.text_size('.')
+	w_combined, _ := ctx.text_size(text + '.')
+	mut w := w_combined - w_dot
+	if w <= 0 {
+		w = (text.runes().len * size * 11) / 20
+	}
+	return w
+}
+
+fn position_cursor_singleline(mx int, x int, w int, size int, mut input TextInput, ctx &gg.Context) {
 	runes := input.text.runes()
 	mut min_dist := 999999
 	mut best_col := 0
 	for col in 0 .. runes.len + 1 {
 		sub_text := runes[0..col].string()
-		mut sub_w, _ := ctx.text_size(sub_text)
-		if sub_w == 0 {
-			sub_w = (col * size * 11) / 20
-		}
+		sub_w := text_width(ctx, sub_text, size)
 		dist := x + 10 + sub_w - mx
 		mut abs_dist := dist
 		if abs_dist < 0 {
@@ -400,7 +410,6 @@ fn position_cursor_singleline(mx int, x int, w int, size int, mut input TextInpu
 }
 
 fn position_cursor_multiline(mx int, my int, x int, y int, w int, h int, size int, mut input TextInput, ctx &gg.Context) {
-	ctx.set_text_cfg(size: size)
 	lines := wrap_text(input.text, w - 20, size, ctx)
 	starts := find_line_starts(input.text, lines)
 	
@@ -425,10 +434,7 @@ fn position_cursor_multiline(mx int, my int, x int, y int, w int, h int, size in
 	mut best_col := 0
 	for col in 0 .. line_runes.len + 1 {
 		sub_text := line_runes[0..col].string()
-		mut sub_w, _ := ctx.text_size(sub_text)
-		if sub_w == 0 {
-			sub_w = (col * size * 11) / 20
-		}
+		sub_w := text_width(ctx, sub_text, size)
 		dist := x + 10 + sub_w - mx
 		mut abs_dist := dist
 		if abs_dist < 0 {
@@ -601,7 +607,6 @@ fn move_cursor_down(mut input TextInput, w int, ctx &gg.Context) {
 }
 
 fn wrap_text(text string, max_width int, size int, ctx &gg.Context) []string {
-	ctx.set_text_cfg(size: size)
 	words := text.split(' ')
 	mut lines := []string{}
 	mut current_line := ''
@@ -610,10 +615,7 @@ fn wrap_text(text string, max_width int, size int, ctx &gg.Context) []string {
 			parts := word.split('\n')
 			for i, part in parts {
 				test_line := if current_line == '' { part } else { current_line + ' ' + part }
-				mut w, _ := ctx.text_size(test_line)
-				if w == 0 {
-					w = (test_line.len * size * 11) / 20
-				}
+				w := text_width(ctx, test_line, size)
 				if w > max_width {
 					lines << current_line
 					current_line = part
@@ -628,10 +630,7 @@ fn wrap_text(text string, max_width int, size int, ctx &gg.Context) []string {
 			continue
 		}
 		test_line := if current_line == '' { word } else { current_line + ' ' + word }
-		mut w, _ := ctx.text_size(test_line)
-		if w == 0 {
-			w = (test_line.len * size * 11) / 20
-		}
+		w := text_width(ctx, test_line, size)
 		if w > max_width {
 			lines << current_line
 			current_line = word
@@ -664,10 +663,15 @@ fn draw_text_field(x int, y int, w int, h int, input TextInput, ctx &gg.Context,
 		runes := text_to_draw.runes()
 		mut cursor_x := x + 10
 		if input.is_focused {
-			sub_w := if input.cursor_pos > 0 { 
-				mut sw, _ := ctx.text_size(runes[0..input.cursor_pos].string())
-				if sw == 0 { sw = (input.cursor_pos * 14 * 11) / 20 }
-				sw
+			mut safe_pos := input.cursor_pos
+			if safe_pos < 0 {
+				safe_pos = 0
+			}
+			if safe_pos > runes.len {
+				safe_pos = runes.len
+			}
+			sub_w := if safe_pos > 0 { 
+				text_width(ctx, runes[0..safe_pos].string(), 14)
 			} else { 0 }
 			cursor_x += sub_w
 		}
@@ -714,13 +718,10 @@ fn draw_text_field_multiline(x int, y int, w int, h int, input TextInput, ctx &g
 			line_text := lines[cursor_line_idx]
 			line_runes := line_text.runes()
 			
-			safe_offset := if offset < 0 { 0 } else if offset > line_runes.len { line_runes.len } else { offset }
+			mut safe_offset := if offset < 0 { 0 } else if offset > line_runes.len { line_runes.len } else { offset }
 			
 			sub_text := line_runes[0..safe_offset].string()
-			mut sub_w, _ := ctx.text_size(sub_text)
-			if sub_w == 0 {
-				sub_w = (safe_offset * 14 * 11) / 20
-			}
+			sub_w := text_width(ctx, sub_text, 14)
 			
 			cx := x + 10 + sub_w
 			cy := y + 8 + cursor_line_idx * 20
@@ -748,7 +749,7 @@ fn draw_view_mode(app &App, t Theme) {
 		mut tx := 280
 		for tag in entry.tags {
 			tag_str := '#${tag}'
-			tw, _ := app.ctx.text_size(tag_str)
+			tw := text_width(app.ctx, tag_str, 12)
 			app.ctx.draw_rect_filled(tx, 115, tw + 10, 22, t.input_bg)
 			app.ctx.draw_text(tx + 5, 118, tag_str, size: 12, color: gg.rgb(6, 182, 212))
 			tx += tw + 18
@@ -1390,7 +1391,8 @@ fn on_frame(mut app App) {
 			app.ctx.draw_rect_filled(10, by, 230, 60, t.input_bg)
 			app.ctx.draw_rect_empty(10, by, 230, 60, t.border)
 		}
-		title_trunc := if entry.title.len > 18 { entry.title[0..15] + '...' } else { entry.title }
+		title_runes := entry.title.runes()
+		title_trunc := if title_runes.len > 18 { title_runes[0..15].string() + '...' } else { entry.title }
 		app.ctx.draw_text(20, by + 8, title_trunc, size: 14, color: t.text_primary, bold: true)
 		app.ctx.draw_text(20, by + 32, '${entry.date}  ${entry.mood}', size: 12, color: t.text_sec)
 	}
